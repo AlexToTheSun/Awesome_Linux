@@ -42,5 +42,10 @@ c
 3. https://dev.to/siddharthshyniben/create-bash-aliases-to-work-faster-l91
 4. https://losst.pro/poleznye-alias-linux
 5. `alias --help`
-6. `man aliases`
+6. `type alias`
+7. `apt install man -y && man aliases`
+8. `whatis aliases #uses man database`
+9. `apropos alias #uses man database`
+10. `apt install tldr && tldr alias`
+11. `help alias`
 
