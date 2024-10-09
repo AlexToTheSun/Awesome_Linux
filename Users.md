@@ -8,7 +8,7 @@ users # список активных пользователей
 tail -n 1 /etc/passwd # последняя строчка с добевленным пользов.
 ls -la /home/user # Вывести содержимое директорий с отображением прав на файлы
 ```
-Как залогинеться под пользователем
+Авторизация под пользователем
 ```bash
 # По ssh
 ssh -p 22 root@xx.xx.xx.xx
@@ -49,6 +49,12 @@ sudo systemctl status rsyslog
 /var/log/kern.log # Журнал сообщений ядра.
 /var/log/daemon.log # Журнал для сообщений служб (демонов).
 ```
+Ссылки по rsyslog:
+- [Логирование rsyslog](https://habr.com/ru/articles/321262/)
+- [rsyslog github](https://github.com/rsyslog/rsyslog)
+- [Настройка rsyslog](https://blog.sedicomm.com/2018/11/11/kak-nastroit-tsentralnyj-server-vedeniya-logov-s-pomoshhyu-rsyslog-v-linux/), [Видео](https://www.youtube.com/watch?v=Os-rBk1-ogU)
+- [Просмотр логов](https://profitserver.ru/knowledge-base/linux-logs/)
+- [Ссылка на проблему упорядочивания логов](https://github.com/rsyslog/rsyslog/issues/1400)
 
 2. **Минимизировать риски своего поведения**
 
@@ -94,7 +100,8 @@ gpasswd -d <user> <group>
 Необходимые команды для создания и редактирования пользвателей
 ```bash
 useradd
-usermod
+groupadd
+usermod  # usermod -aG sudo user_name
 userdel
 passwd - модиф. пароля
 chpasswd - модиф. пароля без прав суперпользователя
@@ -102,9 +109,8 @@ chage - изм. срока действия пароля
 users - список активных пользователей
 chsh - изм. оболочки пользователя
 chfn - изм. инф. о пользователе
-deluser - удаление пользов. из группы
-gpasswd - удаление пользов. из группы
-groupadd - создание новой группы
+deluser user group - удаление пользов. из группы
+gpasswd -d user group- удаление пользов. из группы
 ```
 
 Пример создания пользователя:
@@ -147,25 +153,112 @@ nano /etc/passwd
 # Либо командой usermod
 sudo usermod -d /home/username username
 ```
+# Настройка безопасности
+Настройку проводите с дополнительно открытой сессией на случай если ssh будет настроин некорректно и будет отказ при логине в новой сессии.
 
-# Ссылки:
-- [Логирование rsyslog](https://habr.com/ru/articles/321262/)
-- [rsyslog github](https://github.com/rsyslog/rsyslog)
-- [Настройка rsyslog](https://blog.sedicomm.com/2018/11/11/kak-nastroit-tsentralnyj-server-vedeniya-logov-s-pomoshhyu-rsyslog-v-linux/), [Видео](https://www.youtube.com/watch?v=Os-rBk1-ogU)
-- [Просмотр логов](https://profitserver.ru/knowledge-base/linux-logs/)
-- [Ссылка на проблему упорядочивания логов](https://github.com/rsyslog/rsyslog/issues/1400)
+### Этапы настройки 2FA для new_user:
+1. Логин под new_user
+2. Генерация 2ФА
+3. Корректировка файлов `/etc/pam.d/sshd` и `/etc/ssh/sshd_config`
+4. Рестрарт `sshd`
 
-
+Заранее замечу, что в файле `/etc/ssh/sshd_config` имеется параматр `AuthenticationMethods` для глобальной настройки его используют вне блока Match User. Но если надо настроить исключение из глобальной настройки `AuthenticationMethods` для отдельных пользователей то применяют , как в примере ниже 
+```bash
+Match User new_user_1
+    AuthenticationMethods publickey,keyboard-interactive
+Match User new_user_2
+    AuthenticationMethods publickey
 ```
+
+## Для примера настроим вход user_1 c паролем+2FA, а user_2 c ssh pubkwy + 2FA
+Создадим пользователей, и начнем настройку с `user_1`
+```bash
+sudo useradd -m -G sudo -s /bin/bash user_1 && sudo passwd user_1
+sudo useradd -m -G sudo -s /bin/bash user_2 && sudo passwd user_2
+
+su - user_1
+google-authenticator # сгенерируйте или вставьте уже исользуемый .google_authenticator от другого поьзователя
+ls -la /home/user_1/.google_authenticator
+# stdout
+-r-------- 1 user_1 user_1 119 Oct  9 07:39 /home/user_1/.google_authenticator
+```
+
+#### edit  /etc/pam.d/sshd for user_1
+Вставим две строки вконец файла `sshd`
+```
+cp /etc/pam.d/sshd /etc/pam.d/sshd_backup
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config_backup
+echo 'auth    required      pam_unix.so     no_warn try_first_pass
+auth    required      pam_google_authenticator.so nullok' >> /etc/pam.d/sshd
+```
+После успешной настройки всех пользователей убирем/закомментируем паратетр `nullok` чтобы 2FA была обязательным шагом авторизации. С `nullok` 2FA требуется только от пользователей, настроивших этот этап авторизации.
+```
+sed -i '/auth    required      pam_google_authenticator.so/c\auth    required      pam_google_authenticator.so # nullok' /etc/pam.d/sshd
+```
+
+#### edit /etc/ssh/sshd_config for user_1
+Строка ниже актуальна как для входа по паролю так и по ssh key. По дэфолту он выставлен правильно `yes`
+```
+KbdInteractiveAuthentication yes
+# Либо устаревший вариант этого парамета
+ChallengeResponseAuthentication yes
+```
+Теперь надо определить порядок авторизации. Вставим в конец файла условия конкретно для user_1:
+```
+sudo tee -a /etc/ssh/sshd_config > /dev/null <<'EOF'
+Match User user_1
+    AuthenticationMethods keyboard-interactive
+EOF
+```
+Стоит упомянуть что перенаправление (к примеру, с использованием `>>`) происходит в контексте пользователя, который выполняет команду, а не в контексте `sudo`. Это означает, что хотя `sudo echo` выполняется с правами `root`, сам `>> /etc/ssh/sshd_config` выполняется с правами `user_1`, и не имеет прав для записи.
+```
+# Пример перенаправление с правами user_1
+sudo echo 'Match User user_1
+    AuthenticationMethods keyboard-interactive' >> /etc/ssh/sshd_config
+
+sudo cat << 'EOF' >> /etc/ssh/sshd_config
+Match User user_1
+    AuthenticationMethods keyboard-interactive
+EOF
+
+# Пример с командой tee. Строки вставляются вконец файла
+echo 'Match User user_1
+    AuthenticationMethods keyboard-interactive' | sudo tee -a /etc/ssh/sshd_config > /dev/null
+```
+Рестарт сервиса ssh и проверим вход, если не работает решаем проблемы и переходим к настройки user_2
+```
+sudo systemctl restart sshd
+```
+### Продолжение - настройка user_2
+Сдесь мы создадим ssh-key конкретно для user_2 и зададим вход по ssh-key+2FA
+```
+su - user_2
+google-authenticator
+ls -la /home/user_1/.google_authenticator
+
+ssh-keygen
+# Файлы сохранены в /home/user_2/.ssh
+# ~/.ssh/id_rsa - private key закачайте на ПК для входа по ssh.
+# ~/.ssh/id_rsa.pub - public key. Остается на сервере.
+```
+ЕСЛИ НАДО конвертируйте ключ с помошью  [puttykeygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html). Подробне о ssh key login [тут](https://github.com/AlexToTheSun/Validator_Activity/blob/main/Mainnet-Guides/Minimum-server-protection.md#ssh-key-login) 
+Выберите RSA 2048
+```
+sudo tee -a /etc/ssh/sshd_config > /dev/null <<'EOF'
+Match User user_2
+    AuthenticationMethods publickey,keyboard-interactive
+EOF
+
+sudo systemctl restart sshd
+```
+Ссылки:
+1 https://www.linode.com/docs/guides/secure-ssh-access-with-2fa/
+2 https://docs.vultr.com/how-to-use-two-factor-authentication-with-sudo-and-ssh-on-linux-with-google-authenticator
+
+
+
+
 Далее:
-Как создать
-Как модифицировать 
--- как создать домашний каталог если изначально он не был создан
--- какой командой создается (2мя) каталог
 -- почему иногда (shell) не пишется: приглашение в sell и в bash
-Как логинеться
-Как использовать
-Как обезапасить
-Список литературы
-```
+
 
