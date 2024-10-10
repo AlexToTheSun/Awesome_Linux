@@ -154,7 +154,14 @@ nano /etc/passwd
 sudo usermod -d /home/username username
 ```
 # Настройка безопасности
-Настройку проводите с дополнительно открытой сессией на случай если ssh будет настроин некорректно и будет отказ при логине в новой сессии.
+Ссылки:
+- [Статья linode: Use 2FA (Two-Factor Authentication) with SSH](https://www.linode.com/docs/guides/secure-ssh-access-with-2fa/)
+- [Статья Vultr: How to Use Two-Factor Authentication with Sudo and SSH on Linux with Google Authenticator](https://docs.vultr.com/how-to-use-two-factor-authentication-with-sudo-and-ssh-on-linux-with-google-authenticator)
+- [Статья DigitalOcean: How To Configure SSH Key-Based Authentication on a Linux Server](https://www.digitalocean.com/community/tutorials/how-to-configure-ssh-key-based-authentication-on-a-linux-server)
+- [Статья базовой безопасности от techdocs](https://techdocs.akamai.com/cloud-computing/docs/set-up-and-secure-a-compute-instance)
+- [Ссылка для скачивания puttygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
+ 
+Настройку проводите с дополнительно открытой сессией на случай если ssh будет настроен некорректно и произойдет отказ при авторизации в новой сессии.
 
 ### Этапы настройки 2FA для new_user:
 1. Логин под new_user
@@ -170,40 +177,41 @@ Match User new_user_2
     AuthenticationMethods publickey
 ```
 
-## Для примера настроим вход user_1 c паролем+2FA, а user_2 c ssh pubkwy + 2FA
-Создадим пользователей, и начнем настройку с `user_1`
+## Пример
+Для примера настроим вход user_1 c `паролем+2FA`, а user_2 c  `паролем+2FA+ssh_key`.
+Создадим пользователей, и сделаем бэкап файлов конфигурации, для возможного восстановления в случае ошибки. 
 ```bash
 sudo useradd -m -G sudo -s /bin/bash user_1 && sudo passwd user_1
 sudo useradd -m -G sudo -s /bin/bash user_2 && sudo passwd user_2
-
+sudo cp /etc/pam.d/sshd /etc/pam.d/sshd_backup
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config_backup
+```
+### Базовая настройка конфигурации ssh
+Корректируем  `/etc/pam.d/sshd`. Это требуется для обоих пользователей. Вставим две строки вконец файла.
+```
+sudo tee -a /etc/pam.d/sshd > /dev/null <<'EOF'
+auth    required      pam_unix.so     no_warn try_first_pass
+auth    required      pam_google_authenticator.so nullok
+EOF
+# После успешной настройки пользователей мы должны убрать параметр `nullok`
+```
+Корректируем `/etc/ssh/sshd_config`
+По дэфолту он выставлен правильно `yes`, проверим `sudoedit /etc/ssh/sshd_config`
+```
+KbdInteractiveAuthentication yes
+# Либо устаревший вариант этого парамета:
+ChallengeResponseAuthentication yes
+```
+### user_1
+Начнем настройку с user_1.
+```bash
 su - user_1
 google-authenticator # сгенерируйте или вставьте уже исользуемый .google_authenticator от другого поьзователя
 ls -la /home/user_1/.google_authenticator
 # stdout
 -r-------- 1 user_1 user_1 119 Oct  9 07:39 /home/user_1/.google_authenticator
 ```
-
-#### edit  /etc/pam.d/sshd for user_1
-Вставим две строки вконец файла `sshd`
-```
-cp /etc/pam.d/sshd /etc/pam.d/sshd_backup
-cp /etc/ssh/sshd_config /etc/ssh/sshd_config_backup
-echo 'auth    required      pam_unix.so     no_warn try_first_pass
-auth    required      pam_google_authenticator.so nullok' >> /etc/pam.d/sshd
-```
-После успешной настройки всех пользователей убирем/закомментируем паратетр `nullok` чтобы 2FA была обязательным шагом авторизации. С `nullok` 2FA требуется только от пользователей, настроивших этот этап авторизации.
-```
-sed -i '/auth    required      pam_google_authenticator.so/c\auth    required      pam_google_authenticator.so # nullok' /etc/pam.d/sshd
-```
-
-#### edit /etc/ssh/sshd_config for user_1
-Строка ниже актуальна как для входа по паролю так и по ssh key. По дэфолту он выставлен правильно `yes`
-```
-KbdInteractiveAuthentication yes
-# Либо устаревший вариант этого парамета
-ChallengeResponseAuthentication yes
-```
-Теперь надо определить порядок авторизации. Вставим в конец файла условия конкретно для user_1:
+Корректируем `/etc/ssh/sshd_config` для user_1. Надо определить порядок авторизации. Вставим в конец файла условия, конкретно для user_1:
 ```
 sudo tee -a /etc/ssh/sshd_config > /dev/null <<'EOF'
 Match User user_1
@@ -225,12 +233,12 @@ EOF
 echo 'Match User user_1
     AuthenticationMethods keyboard-interactive' | sudo tee -a /etc/ssh/sshd_config > /dev/null
 ```
-Рестарт сервиса ssh и проверим вход, если не работает решаем проблемы и переходим к настройки user_2
+Рестарт сервиса ssh и проверим вход, если не работает решаем проблемы.
 ```
 sudo systemctl restart sshd
 ```
-### Продолжение - настройка user_2
-Сдесь мы создадим ssh-key конкретно для user_2 и зададим вход по ssh-key+2FA
+### Настройка user_2
+Переходим к настройки user_2. Сдесь мы создадим ssh-key конкретно для user_2 и зададим вход по ssh-key+2FA
 ```
 su - user_2
 google-authenticator
@@ -251,9 +259,13 @@ EOF
 
 sudo systemctl restart sshd
 ```
-Ссылки:
-1 https://www.linode.com/docs/guides/secure-ssh-access-with-2fa/
-2 https://docs.vultr.com/how-to-use-two-factor-authentication-with-sudo-and-ssh-on-linux-with-google-authenticator
+После того как мы проверили что настроили успешно всех пользователей убирем/закомментируем параметр `nullok` чтобы 2FA была обязательным шагом авторизации. С `nullok` 2FA требуется только от пользователей, настроивших этот этап авторизации.
+```
+sed -i '/auth    required      pam_google_authenticator.so/c\auth    required      pam_google_authenticator.so # nullok' /etc/pam.d/sshd
+```
+
+
+
 
 
 
