@@ -1,22 +1,33 @@
 Данной статьи будет достаточно для того, чтобы сформировать у начинающих администраторов базовое понимание и методики использования users в UNIX системах.
 
-Информационные  команды
+
 ```bash
+# Хранилища учетных записей
+/etc/passwd
+/etc/shadow
+/etc/group
+/etc/gshadow
+man [passwd|shadow|group|gshadow]
+
+# Информационные  команды
 id user_name
 cat /etc/passwd | grep user_name # Информацией о пользователях
-users # список активных пользователей
 tail -n 1 /etc/passwd # последняя строчка с добевленным пользов.
+users # список активных пользователей
 ls -la /home/user # Вывести содержимое директорий с отображением прав на файлы
-```
-Авторизация под пользователем
-```bash
+
+# Авторизация под пользователем
 # По ssh
-ssh -p 22 root@xx.xx.xx.xx
-ssh -h
-# Находять уже в терминале под одним из пользователей
+ssh -p 22 -id /path/on/your/compute/privat_key user_name@xx.xx.xx.xx
+ssh --help
+
+# Находять уже на сервере под одним из пользователей, в сессии терминала
+# Разница в su -l и sudo -i -u в том что sodo явно указывает что кроме switch user еще выдает пользователю права root
 su -
-sudo -i
 su - user_name
+su -l user_name
+sudo -i
+sudo -i -u user_name
 ```
 # Users, зачем нужны?
 Есть два главных юзкейса в исользовании users.
@@ -160,6 +171,8 @@ sudo usermod -d /home/username username
 - [Статья DigitalOcean: How To Configure SSH Key-Based Authentication on a Linux Server](https://www.digitalocean.com/community/tutorials/how-to-configure-ssh-key-based-authentication-on-a-linux-server)
 - [Статья базовой безопасности от techdocs](https://techdocs.akamai.com/cloud-computing/docs/set-up-and-secure-a-compute-instance)
 - [Ссылка для скачивания puttygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
+- [About no /etc/nologin](https://unix.stackexchange.com/questions/17906/can-i-allow-a-non-root-user-to-log-in-when-etc-nologin-exists)
+- 
  
 Настройку проводите с дополнительно открытой сессией на случай если ssh будет настроен некорректно и произойдет отказ при авторизации в новой сессии.
 
