@@ -169,10 +169,9 @@ sudo usermod -d /home/username username
 - [Статья linode: Use 2FA (Two-Factor Authentication) with SSH](https://www.linode.com/docs/guides/secure-ssh-access-with-2fa/)
 - [Статья Vultr: How to Use Two-Factor Authentication with Sudo and SSH on Linux with Google Authenticator](https://docs.vultr.com/how-to-use-two-factor-authentication-with-sudo-and-ssh-on-linux-with-google-authenticator)
 - [Статья DigitalOcean: How To Configure SSH Key-Based Authentication on a Linux Server](https://www.digitalocean.com/community/tutorials/how-to-configure-ssh-key-based-authentication-on-a-linux-server)
-- [Статья базовой безопасности от techdocs](https://techdocs.akamai.com/cloud-computing/docs/set-up-and-secure-a-compute-instance)
+- [Статья базовой безопасности от techdocs!](https://techdocs.akamai.com/cloud-computing/docs/set-up-and-secure-a-compute-instance)
 - [Ссылка для скачивания puttygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
 - [About no /etc/nologin](https://unix.stackexchange.com/questions/17906/can-i-allow-a-non-root-user-to-log-in-when-etc-nologin-exists)
-- 
  
 Настройку проводите с дополнительно открытой сессией на случай если ssh будет настроен некорректно и произойдет отказ при авторизации в новой сессии.
 
@@ -296,7 +295,20 @@ sed -i '/auth    required      pam_google_authenticator.so/c\auth    required   
 ```
 
 
-Далее:
--- почему иногда (shell) не пишется: приглашение в sell и в bash
+# Заметки
+### Приглашение командного интерпритатора
+Если оболочка командного интерпритатора /bin/shell,  то приглашение будет классическим
+```
+$ -символ классического приглашения пользователя
+# -для суперпользователя 
+```
+Если выбрать для пользователя /bin/bash, то увидим более информативное приглашение
+```bash
+user_name@computer_name:~$
+# ~ это символ условного имени домашнего каталога пользователя. Команда `echo ~` покажет домашнюю директорию пользователя
+# computer_name - собственное имя компьютера
+```
+### Использование id_rsa
+При генерации ssh_key на сервере, создается файл приватного ключа id_rsa который подходит для использования на UNIX системах, допусти чтобы залогинеться на сервер через ком. строку MacBook или ПК на Ubuntu (через встроенную командную строку).
 
-
+Используйте [puttykeygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html) для конвертации id_rsa в файл id_rsa.ppk (выбрать RSA 2048) для авторизации через терминалы вроде putty.
