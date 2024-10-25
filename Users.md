@@ -150,7 +150,7 @@ useradd --help
 sudo useradd -m -p 123123 -G sudo -s /bin/bash user_name
 ```
 Пароль лучше здавать в интерактивном режиме либо файлом, чтобы в истории не сохрнялись команды с паролями от созданных пользователей:
-```
+```bash
 sudo useradd -m -G sudo -s /bin/bash user_name && sudo passwd user_name
 ```
 ### Домашний каталог пользователя
@@ -163,7 +163,7 @@ sudo mkdir /home/username
 sudo cp -r /etc/skel/. /home/username
 ```
 Установим пользователя и группу владельцем нового домашнего каталога:
-```
+```bash
 sudo chown -R username:username /home/username
 ```
 В файле `/etc/passwd` надо записать созданный каталог как домашний каталог пользователя.
@@ -211,7 +211,7 @@ sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config_backup
 ```
 ### Базовая настройка конфигурации ssh
 Корректируем  `/etc/pam.d/sshd`. Это требуется для обоих пользователей. Вставим две строки вконец файла.
-```
+```bash
 sudo tee -a /etc/pam.d/sshd > /dev/null <<'EOF'
 auth    required      pam_unix.so     no_warn try_first_pass
 auth    required      pam_google_authenticator.so nullok
@@ -220,7 +220,7 @@ EOF
 ```
 Корректируем `/etc/ssh/sshd_config`
 По дэфолту он выставлен правильно `yes`, проверим `sudoedit /etc/ssh/sshd_config`
-```
+```bash
 KbdInteractiveAuthentication yes
 # Либо устаревший вариант этого парамета:
 ChallengeResponseAuthentication yes
@@ -235,14 +235,14 @@ ls -la /home/user_1/.google_authenticator
 -r-------- 1 user_1 user_1 119 Oct  9 07:39 /home/user_1/.google_authenticator
 ```
 Корректируем `/etc/ssh/sshd_config` для того чтобы определить авторизацию `user_1` - условие `keyboard-interactive` включает в себя как пароль так и google-2fa:
-```
+```bash
 sudo tee -a /etc/ssh/sshd_config > /dev/null <<'EOF'
 Match User user_1
     AuthenticationMethods keyboard-interactive
 EOF
 ```
 > Стоит упомянуть что перенаправление (к примеру, с использованием `>>`) происходит в контексте пользователя, который выполняет команду, а не в контексте `sudo`. Это означает, что хотя `sudo echo` выполняется с правами `root`, сам `>> /etc/ssh/sshd_config` выполняется с правами `user_1`, и не имеет прав для записи.
-```
+```bash
 # Пример перенаправление с правами user_1
 sudo echo 'Match User user_1
     AuthenticationMethods keyboard-interactive' >> /etc/ssh/sshd_config
@@ -257,12 +257,12 @@ echo 'Match User user_1
     AuthenticationMethods keyboard-interactive' | sudo tee -a /etc/ssh/sshd_config > /dev/null
 ```
 Рестарт сервиса ssh и проверим вход, если не работает решаем проблемы.
-```
+```bash
 sudo systemctl restart sshd
 ```
 ### Настройка user_2 (ssh_key+passwd+2fa)
 Сгенерируем 2fa
-```
+```bash
 su - user_2
 google-authenticator
 ls -la /home/user_1/.google_authenticator
@@ -279,28 +279,31 @@ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
 
 ```
 Если вы хотите не создавать а скопировать из home дирктории другого пользователя:
-```
+```bash
 mkdir .ssh
 sudo cp  /home/user_2/.ssh/id_rsa.pub  /home/user_1/.ssh/id_rsa.pub
 sudo cp  /home/user_2/.ssh/id_rsa  /home/user_1/.ssh/id_rsa
 sudo cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+
+# Команда ниже нужна для того чтобы перекинуть id_rsa.pub со стороннего сервера на настраиваемый
+sudo cat ~/.ssh/id_rsa.pub | sudo ssh -p 22 -i /path/on/your/compute/privat_key username@remote_host "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
 ```
 
 Используйте [puttykeygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html) для конвертации id_rsa в файл id_rsa.ppk (надо выбрать RSA 2048) для авторизации через терминалы вроде putty. Либо используйте исходный файл id_rsa для входа через консоль сервера/ПК на unix.
 
 Корректируем `/etc/ssh/sshd_config` для того чтобы определить авторизацию `user_2` - условие `publickey,keyboard-interactive` будет запрашивать ssh-key, passwd, google-2fa:
-```
+```bash
 sudo tee -a /etc/ssh/sshd_config > /dev/null <<'EOF'
 Match User user_2
     AuthenticationMethods publickey,keyboard-interactive
 EOF
 ```
 Рестарт сервиса sshd
-```
+```bash
 sudo systemctl restart sshd
 ```
 После того как мы проверили что настроили успешно всех пользователей убирем/закомментируем параметр `nullok` чтобы 2FA была обязательным шагом авторизации. С `nullok` 2FA требуется только от пользователей, настроивших этот этап авторизации.
-```
+```bash
 sed -i '/auth    required      pam_google_authenticator.so/c\auth    required      pam_google_authenticator.so # nullok' /etc/pam.d/sshd
 ```
 
@@ -308,7 +311,7 @@ sed -i '/auth    required      pam_google_authenticator.so/c\auth    required   
 # Заметки
 ### Приглашение командного интерпритатора
 Если оболочка командного интерпритатора /bin/shell,  то приглашение будет классическим
-```
+```bash
 $ -символ классического приглашения пользователя
 # -для суперпользователя 
 ```
