@@ -182,8 +182,25 @@ sudo usermod -d /home/username username
 - [Статья базовой безопасности от techdocs!](https://techdocs.akamai.com/cloud-computing/docs/set-up-and-secure-a-compute-instance)
 - [Ссылка для скачивания puttygen](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
 - [About no /etc/nologin](https://unix.stackexchange.com/questions/17906/can-i-allow-a-non-root-user-to-log-in-when-etc-nologin-exists)
+- [Замена SSH порта](https://www.hostinger.com/tutorials/how-to-change-ssh-port-vps?utm_campaign=Generic-Tutorials-DSA|NT:Se|LO:NL&utm_medium=ppc&gad_source=1&gclid=CjwKCAiAmfq6BhAsEiwAX1jsZ4QYcxOlVtKoKhMhtiGaiA0i_SDMV9or0y6mZQiYPU0ey8T0LKfZsBoCBo8QAvD_BwE)
  
 Настройку проводите с дополнительно открытой сессией на случай если ssh будет настроен некорректно и произойдет отказ при авторизации в новой сессии.
+
+### Замена SSH порта
+```
+sudo nano /etc/ssh/sshd_config
+```
+Заскомментировать строчку `#Port 22` и вместо 22 поставить своё число. 
+
+Далее - рестарт ssh сервиса. Вот варианты рестарта:
+```
+sudo systemctl restart sshd
+sudo systemctl restart ssh
+sudo service ssh restart
+
+sudo systemctl status ssh
+```
+
 
 ### Этапы настройки 2FA для new_user:
 1. Логин под new_user
